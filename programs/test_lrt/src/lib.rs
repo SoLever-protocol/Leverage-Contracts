@@ -269,6 +269,6 @@ pub enum LRTError {
   #[msg("Deposit caused overflow")]
   DepositOverflow,
 
-  #[msg("Slashing caused overflow")]
+  #[msg("Slashing caused underflow")]
   SlashingUnderflow,
 }
