@@ -12,8 +12,14 @@ use mpl_token_metadata::types::DataV2;
 
 const ADMIN_PUBKEY: Pubkey = pubkey!("8Vog23RLStZ3H8vEZMW7tCMow687Xba6EAarhd5f4UU");
 const EVSOL_SEED: &[u8] = b"evSOL";
+const SLASH_TRACKER_SEED: &[u8] = b"slashing";
 
 declare_id!("GWukmhTitefhHyGpz3G8a6e5RbGGWaiEJgCdRWpMfXYj");
+
+#[account]
+pub struct CollateralTracker {
+    pub tokens_deposited: u64,
+}
 
 #[program]
 pub mod test_lrt {
@@ -66,6 +72,10 @@ pub mod test_lrt {
             None,
         )?;
 
+        // initialize collateral checker
+        let collateral_tracker = &mut ctx.accounts.collateral_tracker;
+        collateral_tracker.tokens_deposited = 0;
+
         Ok(())
     }
 
@@ -106,10 +116,25 @@ pub mod test_lrt {
             // TODO: replace this amount with something that gets the evSOL price
             amount
         )?;
+        let collateral_tracker = &mut ctx.accounts.collateral_tracker;
+        collateral_tracker.tokens_deposited = collateral_tracker.tokens_deposited.checked_add(amount).ok_or(LRTError::DepositOverflow)?;
+        //collateral_tracker.tokens_deposited = collateral_tracker.tokens_deposited + amount;
+        Ok(())
+    }
 
+    pub fn tokens_deposited(ctx: Context<TokensDeposited>) -> Result<u64> {
+        Ok(ctx.accounts.collateral_tracker.tokens_deposited)
+    }
+
+    pub fn slash(ctx: Context<SlashingInfo>, amount: u64) -> Result<()> {
+        let collateral_tracker = &mut ctx.accounts.collateral_tracker;
+        //collateral_tracker.tokens_deposited = collateral_tracker.tokens_deposited - amount;
+        collateral_tracker.tokens_deposited = collateral_tracker.tokens_deposited.checked_add(amount).ok_or(LRTError::DepositOverflow)?;
         Ok(())
     }
 }
+
+
 
 #[derive(Accounts)]
 pub struct Initialize {}
@@ -146,6 +171,14 @@ pub struct Deposit<'info> {
     #[account(mut)]
     pub deposit_to: Account<'info, TokenAccount>,
 
+    // pass in the collateral tracker so we can add however much we deposit
+    #[account(
+        mut,
+        seeds = [EVSOL_SEED, SLASH_TRACKER_SEED],
+        bump
+    )]
+    pub collateral_tracker: Account<'info, CollateralTracker>,
+
     // evsol mint account
     //#[account]
     // perhaps make this a PDA
@@ -174,6 +207,16 @@ pub struct CreateMint<'info> {
     )]
     pub admin: Signer<'info>,
 
+    // add a collateral tracker
+    #[account(
+        init,
+        seeds = [EVSOL_SEED, SLASH_TRACKER_SEED],
+        bump,
+        payer = admin,
+        space = 8 + 8,
+    )]
+    pub collateral_tracker: Account<'info, CollateralTracker>,
+
     // this same PDA is used as both the address of the mint account and the authority
     // but this implies they could be different(??)
     // also interesting that the mint account seems like it is/must be owned by this program
@@ -198,4 +241,34 @@ pub struct CreateMint<'info> {
     pub token_metadata_program: Program<'info, Metadata>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>
+}
+
+#[derive(Accounts)]
+pub struct TokensDeposited<'info>{
+    // pass in the collateral tracker so we can add however much we deposit
+    #[account(
+        seeds = [EVSOL_SEED, SLASH_TRACKER_SEED],
+        bump
+    )]
+    pub collateral_tracker: Account<'info, CollateralTracker>,
+}
+
+#[derive(Accounts)]
+pub struct SlashingInfo<'info>{
+    // pass in the collateral tracker so we can add however much we deposit
+    #[account(
+        mut,
+        seeds = [EVSOL_SEED, SLASH_TRACKER_SEED],
+        bump
+    )]
+    pub collateral_tracker: Account<'info, CollateralTracker>,
+}
+
+#[error_code]
+pub enum LRTError {
+  #[msg("Deposit caused overflow")]
+  DepositOverflow,
+
+  #[msg("Slashing caused overflow")]
+  SlashingUnderflow,
 }

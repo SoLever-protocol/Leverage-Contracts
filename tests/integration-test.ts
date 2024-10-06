@@ -8,7 +8,9 @@ import { generateSigner, publicKey, signerIdentity } from "@metaplex-foundation/
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import BN = require("@coral-xyz/anchor");
 import * as splToken from "@solana/spl-token";
-import web3, { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import web3, { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { expect } from "chai";
+import { base64 } from "@metaplex-foundation/umi/serializers";
 
 
 describe("test_lrt", () => {
@@ -40,9 +42,15 @@ describe("test_lrt", () => {
     const metadataAccountString = bs58.encode(((new BN.BN(bs58.decode(metadata_PDA_key)))).toArray());
     console.log("metadata account: " + metadataAccountString);
 
+    // get the PDA for the new collateral tracker
+    const [collateralTrackerPDA, _] = await PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode('evSOL'),
+      anchor.utils.bytes.utf8.encode('slashing')
+    ], program.programId)
+
     const tx = await program.methods.createMint(metadata.uri, metadata.name, metadata.symbol)
     .accounts(
       {
+        collateralTracker: collateralTrackerPDA,
         evsolMint: evSOLMintPDA,
         //metadataAccount: (await fetchDigitalAsset(umi, publicKey(evSOLMintPDA))).metadata.publicKey
         // metadataAccount: (await fetchDigitalAsset(umi, evSOLMintPDA)).metadata.publicKey
@@ -145,6 +153,11 @@ describe("test_lrt", () => {
     // create our evsol associated account
     const evsol_associated_acct = splToken.getAssociatedTokenAddressSync(evSOLMintPDA, anchor.getProvider().publicKey);
 
+    // get the PDA for the new collateral tracker
+    const [collateralTrackerPDA, _] = await PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode('evSOL'),
+      anchor.utils.bytes.utf8.encode('slashing')
+    ], program.programId)
+
     console.log("running deposit transaction")
     // deposit
     const deposit_tx = await program.methods.deposit(new anchor.BN(50)).accounts({
@@ -155,8 +168,21 @@ describe("test_lrt", () => {
       // TODO: enforce depositing to our account, for now can be any
       // and, for now, depositing back to the same account we are depositing from
       depositTo: test_token_associated_acct,
+      collateralTracker: collateralTrackerPDA,
       evsolMint: evSOLMintPDA
     }).rpc();
+    //expect(bs58.decode(await (program.methods.tokensDeposited().accounts({
+      //collateralTracker: collateralTrackerPDA,
+    //}).rpc()))).to.equal(new anchor.BN(50).toBuffer())
+  });
+  it("slashes", async () => {
+    const [collateralTrackerPDA, _] = await PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode('evSOL'),
+      anchor.utils.bytes.utf8.encode('slashing')
+    ], program.programId)
+
+    await program.methods.slash(new anchor.BN(5)).accounts({
+      collateralTrackerPDA: collateralTrackerPDA
+    }).rpc()
   })
   
 });
