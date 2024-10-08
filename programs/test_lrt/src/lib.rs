@@ -129,9 +129,17 @@ pub mod test_lrt {
     pub fn slash(ctx: Context<SlashingInfo>, amount: u64) -> Result<()> {
         let collateral_tracker = &mut ctx.accounts.collateral_tracker;
         //collateral_tracker.tokens_deposited = collateral_tracker.tokens_deposited - amount;
+        collateral_tracker.tokens_deposited = collateral_tracker.tokens_deposited.checked_sub(amount).ok_or(LRTError::DepositOverflow)?;
+        Ok(())
+    }
+
+    pub fn pay_yield(ctx: Context<SlashingInfo>, amount: u64) -> Result<()> {
+        let collateral_tracker = &mut ctx.accounts.collateral_tracker;
+        //collateral_tracker.tokens_deposited = collateral_tracker.tokens_deposited - amount;
         collateral_tracker.tokens_deposited = collateral_tracker.tokens_deposited.checked_add(amount).ok_or(LRTError::DepositOverflow)?;
         Ok(())
     }
+
 }
 
 
