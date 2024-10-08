@@ -154,8 +154,12 @@ describe("test_lrt", () => {
     const evsol_associated_acct = splToken.getAssociatedTokenAddressSync(evSOLMintPDA, anchor.getProvider().publicKey);
 
     // get the PDA for the new collateral tracker
-    const [collateralTrackerPDA, _] = await PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode('evSOL'),
+    const [collateralTrackerPDA, _1] = await PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode('evSOL'),
       anchor.utils.bytes.utf8.encode('slashing')
+    ], program.programId)
+
+    const [holdingsPDA, _2] = await PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode('evSOL'),
+      anchor.utils.bytes.utf8.encode('holdings'), test_token_mint.toBuffer()
     ], program.programId)
 
     console.log("running deposit transaction")
@@ -167,9 +171,11 @@ describe("test_lrt", () => {
       depositorSigner: anchor.getProvider().publicKey,
       // TODO: enforce depositing to our account, for now can be any
       // and, for now, depositing back to the same account we are depositing from
-      depositTo: test_token_associated_acct,
+      //depositTo: test_token_associated_acct,
+      depositTo: holdingsPDA,
       collateralTracker: collateralTrackerPDA,
-      evsolMint: evSOLMintPDA
+      evsolMint: evSOLMintPDA,
+      depositMint: test_token_mint.toBuffer()
     }).rpc();
     //expect(bs58.decode(await (program.methods.tokensDeposited().accounts({
       //collateralTracker: collateralTrackerPDA,

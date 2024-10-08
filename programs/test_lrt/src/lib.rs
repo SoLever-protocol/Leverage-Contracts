@@ -12,6 +12,7 @@ use mpl_token_metadata::types::DataV2;
 
 const ADMIN_PUBKEY: Pubkey = pubkey!("8Vog23RLStZ3H8vEZMW7tCMow687Xba6EAarhd5f4UU");
 const EVSOL_SEED: &[u8] = b"evSOL";
+const HOLDINGS_SEED: &[u8] = b"holdings";
 const SLASH_TRACKER_SEED: &[u8] = b"slashing";
 
 declare_id!("GWukmhTitefhHyGpz3G8a6e5RbGGWaiEJgCdRWpMfXYj");
@@ -168,7 +169,11 @@ pub struct Deposit<'info> {
 
     // deposited token account
     // if depositing SOL, this would be the user's wrapped SOL account
-    #[account(mut)]
+    #[account(
+        mut,
+        associated_token::mint = deposit_mint,
+        associated_token::authority = depositor_signer
+    )]
     pub deposit_from: Account<'info, TokenAccount>,
 
     #[account(mut)]
@@ -176,8 +181,19 @@ pub struct Deposit<'info> {
 
     // add constraints to compute this PDA based on the mint of deposit_from
     // TODO: URGENT!!! Otherwise, can deposit wherever you feel like and get evSOL
-    #[account(mut)]
+    //#[account(mut)]
+    #[account(
+        init_if_needed,
+        payer = depositor_signer,
+        //associated_token::mint = deposit_mint,
+        //associated_token::authority = [EVSOL_SEED, HOLDINGS_SEED]
+        seeds = [EVSOL_SEED, HOLDINGS_SEED, deposit_mint.key().as_ref()],
+        bump,
+        space = Mint::LEN
+    )]
     pub deposit_to: Account<'info, TokenAccount>,
+
+    pub deposit_mint: Account<'info, Mint>,
 
     // pass in the collateral tracker so we can add however much we deposit
     #[account(
