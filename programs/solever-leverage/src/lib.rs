@@ -7,7 +7,6 @@ use anchor_spl::{
 };
 use mpl_token_metadata::accounts::Metadata as MetadataAccount;
 
-
 declare_id!("43MDCtWchEp5bEjte91xGDqGU2HCwsjxxoiPcaPfNBp4");
 
 #[program]
@@ -86,7 +85,58 @@ pub mod solever_leverage {
         Ok(())
     }
 
-    //pub fn leverage_restake()
+    pub fn leverage_restake(ctx: Context<BorrowInfo>, credit_seed: Vec<u8>, amount: u64) -> Result<()> {
+        // first, initialize the values of the credit tracker and root correctly
+        ctx.accounts.credit_account.r0 = amount;
+        ctx.accounts.credit_account.previous = ctx.accounts.credit_root.previous;
+        ctx.accounts.credit_root.previous = Some(ctx.accounts.credit_account.key());
+
+        let initial_lrt = ctx.accounts.lrt_holding_account.amount;
+
+        // first, transfer the requested amount to the LST holdings
+        transfer_tokens(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                TransferTokens {
+                    from: ctx.accounts.deposit_from.to_account_info(),
+                    to: ctx.accounts.lst_holding_account.to_account_info(),// TODO add pool account
+                    authority: ctx.accounts.depositor_signer.to_account_info()
+                }
+            ),
+            // TODO: add amount here
+            amount
+        )?;
+
+        // then, try to deposit
+        // test_lrt::cpi::deposit(
+        //     CpiContext::new(
+        //         ctx.accounts.lrt_program.to_account_info(),
+        //         Deposit { mint_to: ctx.accounts.lrt_holding_account.to_account_info(), 
+        //             deposit_from: ctx.accounts.lst_holding_account.to_account_info(),
+        //             depositor_signer: (), 
+        //             deposit_to: (), 
+        //             collateral_tracker: (), 
+        //             evsol_mint: (), 
+        //             token_program: ctx.accounts.token_program.to_account_info(), 
+        //             associated_token_program: ctx.accounts.associated_token_program.to_account_info(), 
+        //             system_program: ctx.accounts.system_program.to_account_info()}
+        //     ), amount)
+        Ok(())
+
+    }
+}
+
+#[account]
+pub struct CreditTracker {
+    pub lrt_balance: u64,
+    pub r0: u64,
+    pub deposit_time: u64,
+    pub previous: Option<Pubkey>
+}
+
+#[account]
+pub struct CreditRoot {
+    pub previous: Option<Pubkey>
 }
 
 #[derive(Accounts)]
@@ -240,6 +290,7 @@ pub struct LendInfo<'info> {
 
 
 #[derive(Accounts)]
+#[instruction(credit_seed: Vec<u8>)]
 pub struct BorrowInfo<'info> {
     #[account(
         mut,
@@ -266,6 +317,24 @@ pub struct BorrowInfo<'info> {
     )]
     pub mint_p_to: Account<'info, TokenAccount>,
 
+    // credit account to track the owed interest etc
+    #[account(
+        init,
+        payer = depositor_signer,
+        space = 8 + 8*3 + 1 + 32,
+        seeds = [credit_seed.as_ref()],
+        bump
+    )]
+    pub credit_account: Account<'info, CreditTracker>,
+
+    #[account(
+        init_if_needed,
+        payer = depositor_signer,
+        space = 8 + 1 + 32,
+        seeds = [depositor_signer.key().as_ref()],
+        bump
+    )]
+    pub credit_root: Account<'info, CreditRoot>,
 
     // must be mutable because pays fees
     #[account(mut)]
@@ -277,6 +346,19 @@ pub struct BorrowInfo<'info> {
         bump
     )]
     lst_holding_account: Account<'info, TokenAccount>,
+
+    pub lrt_program: Program<'info, TestLrt>,
+
+    pub lrt_mint: Account<'info, Mint>,
+
+    #[account(
+        mut, 
+        seeds = [lrt_mint.key().as_ref()],
+        bump, 
+        token::mint = lrt_mint,
+        token::authority = lrt_holding_account
+    )]
+    pub lrt_holding_account: Account<'info, TokenAccount>,
 
     #[account(
         seeds = [lst_mint.key().as_ref(), b"principal"],
