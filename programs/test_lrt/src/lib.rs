@@ -189,7 +189,7 @@ pub struct Deposit<'info> {
         //associated_token::authority = [EVSOL_SEED, HOLDINGS_SEED]
         seeds = [EVSOL_SEED, HOLDINGS_SEED, deposit_mint.key().as_ref()],
         bump,
-        space = Mint::LEN
+        space = TokenAccount::LEN
     )]
     pub deposit_to: Account<'info, TokenAccount>,
 
