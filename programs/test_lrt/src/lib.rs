@@ -179,17 +179,25 @@ pub struct Deposit<'info> {
     #[account(mut)]
     pub depositor_signer: Signer<'info>,
 
+    /// CHECK: account doesn't actually need to be initialized and is never used. Just enforces the seeds.
+    #[account(
+        seeds = [EVSOL_SEED, HOLDINGS_SEED, deposit_mint.key().as_ref()],
+        bump
+    )]
+    pub holdings_signer: UncheckedAccount<'info>,
+
     // add constraints to compute this PDA based on the mint of deposit_from
     // TODO: URGENT!!! Otherwise, can deposit wherever you feel like and get evSOL
     //#[account(mut)]
     #[account(
         init_if_needed,
         payer = depositor_signer,
-        //associated_token::mint = deposit_mint,
-        //associated_token::authority = [EVSOL_SEED, HOLDINGS_SEED]
-        seeds = [EVSOL_SEED, HOLDINGS_SEED, deposit_mint.key().as_ref()],
-        bump,
-        space = TokenAccount::LEN
+        associated_token::mint = deposit_mint,
+        associated_token::authority = holdings_signer,
+        // associated_token::authority = [EVSOL_SEED, HOLDINGS_SEED],
+        // seeds = [EVSOL_SEED, HOLDINGS_SEED, deposit_mint.key().as_ref()],
+        // bump,
+        // space = TokenAccount::LEN
     )]
     pub deposit_to: Account<'info, TokenAccount>,
 

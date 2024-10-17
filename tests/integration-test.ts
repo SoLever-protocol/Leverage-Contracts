@@ -160,7 +160,11 @@ describe("test_lrt", () => {
 
     const [holdingsPDA, _2] = await PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode('evSOL'),
       anchor.utils.bytes.utf8.encode('holdings'), test_token_mint.toBytes()
-    ], program.programId)
+    ], program.programId);
+
+    const holdingsAccount = splToken.getAssociatedTokenAddressSync(test_token_mint, holdingsPDA, true);
+
+    console.log("holdingsPDA: " + holdingsPDA);
 
     console.log("running deposit transaction")
     // deposit
@@ -174,7 +178,8 @@ describe("test_lrt", () => {
       // TODO: enforce depositing to our account, for now can be any
       // and, for now, depositing back to the same account we are depositing from
       //depositTo: test_token_associated_acct,
-      depositTo: holdingsPDA,
+      holdingsSigner: holdingsPDA,
+      depositTo: holdingsAccount,
       depositMint: test_token_mint,
       collateralTracker: collateralTrackerPDA,
       evsolMint: evSOLMintPDA,
