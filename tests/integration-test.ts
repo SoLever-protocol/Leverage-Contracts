@@ -159,12 +159,14 @@ describe("test_lrt", () => {
     ], program.programId)
 
     const [holdingsPDA, _2] = await PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode('evSOL'),
-      anchor.utils.bytes.utf8.encode('holdings'), test_token_mint.toBuffer()
+      anchor.utils.bytes.utf8.encode('holdings'), test_token_mint.toBytes()
     ], program.programId)
 
     console.log("running deposit transaction")
     // deposit
-    const deposit_tx = await program.methods.deposit(new anchor.BN(50)).accounts({
+    const big_fifty = new anchor.BN(50);
+    // const deposit_tx = await program.methods.deposit(new anchor.BN(50)).accounts({
+    const deposit_tx = await program.methods.deposit(big_fifty).accounts({
 // TODO
       mintTo: evsol_associated_acct,
       depositFrom: test_token_associated_acct,
@@ -173,9 +175,9 @@ describe("test_lrt", () => {
       // and, for now, depositing back to the same account we are depositing from
       //depositTo: test_token_associated_acct,
       depositTo: holdingsPDA,
+      depositMint: test_token_mint,
       collateralTracker: collateralTrackerPDA,
       evsolMint: evSOLMintPDA,
-      depositMint: test_token_mint.toBuffer()
     }).rpc();
     //expect(bs58.decode(await (program.methods.tokensDeposited().accounts({
       //collateralTracker: collateralTrackerPDA,
